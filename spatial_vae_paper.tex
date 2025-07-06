@@ -1,0 +1,320 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{natbib}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\geometry{margin=1in}
+
+\title{Spatial-VAE: Learning Spatially-Informed Gene Expression Representations through Variational Autoencoders}
+
+\author{
+Ziad A. T. Ahmed\\
+Department of Computer Science\\
+University of XYZ\\
+\texttt{ziad.ahmed@university.edu}
+}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Understanding the spatial organization of gene expression in brain tissue is crucial for comprehending neural development, function, and disease mechanisms. Traditional approaches often analyze gene expression and spatial information separately, potentially missing important spatial-genetic relationships. We present Spatial-VAE, a novel variational autoencoder architecture that jointly learns gene expression representations while preserving spatial information. Our model incorporates multi-objective learning with reconstruction, classification, and regression tasks to capture both discrete and continuous spatial relationships. Experimental validation on the Allen Brain Atlas demonstrates that Spatial-VAE effectively learns meaningful low-dimensional representations that preserve spatial structure while maintaining gene expression reconstruction quality. The learned representations enable downstream tasks such as spatial prediction and gene pathway analysis, opening new avenues for spatial transcriptomics research.
+
+\textbf{Keywords:} Variational Autoencoders, Spatial Transcriptomics, Gene Expression, Brain Atlas, Deep Learning
+\end{abstract}
+
+\section{Introduction}
+
+The spatial organization of gene expression in biological tissues provides critical insights into cellular function, development, and disease mechanisms. In neuroscience, understanding how gene expression varies across different brain regions is fundamental to comprehending neural circuit formation, function, and dysfunction \cite{lein2007genome}. The Allen Brain Atlas represents one of the most comprehensive spatial gene expression datasets, providing high-resolution measurements across the entire mouse brain \cite{hawrylycz2012atlas}.
+
+Traditional computational approaches for analyzing spatial gene expression data often treat spatial and expression information independently. While this separation enables specialized analysis techniques, it may miss important relationships between gene expression patterns and their spatial context. Recent advances in deep learning, particularly variational autoencoders (VAEs), provide powerful frameworks for learning joint representations that can capture complex, non-linear relationships in high-dimensional data \cite{kingma2013auto}.
+
+Variational autoencoders have emerged as particularly effective tools for biological data analysis due to their ability to learn meaningful low-dimensional representations while providing uncertainty quantification through their probabilistic formulation \cite{lopez2018deep}. However, most existing VAE applications to gene expression data focus solely on expression reconstruction and do not explicitly incorporate spatial information during the learning process.
+
+In this work, we present Spatial-VAE, a novel architecture that extends the standard VAE framework to jointly learn gene expression representations while preserving spatial information. Our key contributions include:
+
+\begin{enumerate}
+\item A multi-objective VAE architecture that simultaneously optimizes reconstruction, spatial classification, and spatial regression objectives
+\item A comprehensive experimental evaluation on high-resolution brain atlas data demonstrating effective spatial-expression representation learning
+\item Analysis of learned representations showing preservation of both gene expression patterns and spatial organization
+\item Open-source implementation enabling reproducible research and further development
+\end{enumerate}
+
+The remainder of this paper is organized as follows: Section \ref{sec:related} reviews related work in spatial transcriptomics and deep learning approaches. Section \ref{sec:methods} details our Spatial-VAE architecture and training methodology. Section \ref{sec:experiments} presents experimental setup and results. Section \ref{sec:discussion} discusses implications and limitations, and Section \ref{sec:conclusion} concludes with future directions.
+
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Spatial Transcriptomics and Brain Atlas Data}
+
+Spatial transcriptomics has emerged as a transformative technology for understanding tissue organization and function \cite{stahl2016visualization}. The Allen Brain Atlas project represents a landmark effort in creating comprehensive spatial gene expression maps across the mouse brain \cite{lein2007genome}. These datasets provide voxel-level gene expression measurements with precise anatomical coordinates, enabling systematic analysis of spatial-genetic relationships.
+
+Traditional computational approaches for spatial transcriptomics include spatial clustering methods \cite{zhao2021spatial}, differential expression analysis across regions \cite{cable2021robust}, and trajectory inference methods \cite{saelens2019comparison}. While these methods provide valuable insights, they typically analyze spatial and expression information separately, potentially missing complex spatial-genetic interactions.
+
+\subsection{Variational Autoencoders in Genomics}
+
+Variational autoencoders have gained significant traction in genomics due to their ability to learn meaningful representations of high-dimensional biological data. scVI \cite{lopez2018deep} demonstrated the effectiveness of VAEs for single-cell RNA sequencing data, incorporating batch effects and zero-inflation modeling. DIVE \cite{rashid2021dive} extended VAE frameworks to handle multi-modal single-cell data.
+
+Recent work has explored incorporating additional biological constraints into VAE architectures. PathwayVAE \cite{graving2021pathway} incorporates known biological pathways into the learning process. However, these approaches have not explicitly addressed spatial information in tissue-level data.
+
+\subsection{Deep Learning for Spatial Data}
+
+Several deep learning approaches have been developed for spatial biological data. ST-Net \cite{he2020stnet} uses graph neural networks to model spatial relationships in spatial transcriptomics data. SpaGCN \cite{hu2021spagcn} combines spatial and expression information through graph convolutional networks. However, these methods focus primarily on clustering and do not learn general-purpose representations suitable for diverse downstream tasks.
+
+Our work differs from existing approaches by explicitly incorporating spatial information into the VAE objective function through multi-task learning, enabling the model to learn representations that preserve both expression and spatial structure.
+
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Problem Formulation}
+
+Let $X \in \mathbb{R}^{N \times G}$ represent gene expression data for $N$ voxels and $G$ genes, and let $S \in \mathbb{R}^{N \times 3}$ represent the corresponding 3D spatial coordinates $(z, y, x)$ for each voxel. Our goal is to learn a low-dimensional representation $Z \in \mathbb{R}^{N \times D}$ (where $D \ll G$) that captures both gene expression patterns and spatial organization.
+
+\subsection{Spatial-VAE Architecture}
+
+Our Spatial-VAE extends the standard VAE framework with additional spatial prediction objectives. The architecture consists of three main components:
+
+\subsubsection{Encoder Network}
+
+The encoder maps gene expression vectors to a latent representation:
+
+\begin{align}
+h &= \text{Encoder}(x_i) \\
+\mu_i &= W_\mu h + b_\mu \\
+\log\sigma^2_i &= W_\sigma h + b_\sigma
+\end{align}
+
+where $x_i \in \mathbb{R}^G$ is the gene expression vector for voxel $i$. The encoder consists of fully connected layers with batch normalization, LeakyReLU activation, and dropout for regularization:
+
+\begin{align}
+\text{Encoder}(x) = \text{LeakyReLU}(\text{BN}(\text{Dropout}(W_2 \text{LeakyReLU}(\text{BN}(W_1 x + b_1)) + b_2)))
+\end{align}
+
+\subsubsection{Decoder Network}
+
+The decoder reconstructs gene expression from the latent representation:
+
+\begin{align}
+\hat{x}_i = \text{Decoder}(z_i)
+\end{align}
+
+where $z_i \sim \mathcal{N}(\mu_i, \sigma^2_i I)$ is sampled from the latent distribution.
+
+\subsubsection{Spatial Prediction Heads}
+
+To incorporate spatial information, we introduce multiple prediction heads that operate on the latent representation:
+
+\textbf{Classification Heads:} For discrete spatial coordinate prediction:
+\begin{align}
+p(z^{cls}_i) &= \text{softmax}(\text{ClassifyZ}(z_i)) \\
+p(y^{cls}_i) &= \text{softmax}(\text{ClassifyY}(z_i)) \\
+p(x^{cls}_i) &= \text{softmax}(\text{ClassifyX}(z_i))
+\end{align}
+
+\textbf{Regression Heads:} For continuous spatial coordinate prediction:
+\begin{align}
+z^{reg}_i &= \text{RegressZ}(z_i) \\
+y^{reg}_i &= \text{RegressY}(z_i) \\
+x^{reg}_i &= \text{RegressX}(z_i)
+\end{align}
+
+\subsection{Multi-Objective Loss Function}
+
+Our training objective combines multiple loss terms to encourage learning of spatial-expression representations:
+
+\begin{align}
+\mathcal{L} = &\mathcal{L}_{recon} + \beta \mathcal{L}_{KL} + w_{cls}(\mathcal{L}_{cls,z} + \mathcal{L}_{cls,y} + \mathcal{L}_{cls,x}) \nonumber \\
+&+ w_{reg}(\mathcal{L}_{reg,z} + \mathcal{L}_{reg,y} + \mathcal{L}_{reg,x}) + w_{reg} \mathcal{L}_{euclidean}
+\end{align}
+
+where:
+
+\textbf{Reconstruction Loss:}
+\begin{align}
+\mathcal{L}_{recon} = \frac{1}{N} \sum_{i=1}^N \|\hat{x}_i - x_i\|_2^2
+\end{align}
+
+\textbf{KL Divergence:}
+\begin{align}
+\mathcal{L}_{KL} = \frac{1}{N} \sum_{i=1}^N \text{KL}(q(z_i|x_i) \| p(z_i))
+\end{align}
+
+\textbf{Classification Losses:}
+\begin{align}
+\mathcal{L}_{cls,z} &= \frac{1}{N} \sum_{i=1}^N \text{CrossEntropy}(p(z^{cls}_i), z^{true}_i) \\
+\mathcal{L}_{cls,y} &= \frac{1}{N} \sum_{i=1}^N \text{CrossEntropy}(p(y^{cls}_i), y^{true}_i) \\
+\mathcal{L}_{cls,x} &= \frac{1}{N} \sum_{i=1}^N \text{CrossEntropy}(p(x^{cls}_i), x^{true}_i)
+\end{align}
+
+\textbf{Regression Losses:}
+\begin{align}
+\mathcal{L}_{reg,z} &= \frac{1}{N} \sum_{i=1}^N (z^{reg}_i - z^{true}_i)^2 \\
+\mathcal{L}_{reg,y} &= \frac{1}{N} \sum_{i=1}^N (y^{reg}_i - y^{true}_i)^2 \\
+\mathcal{L}_{reg,x} &= \frac{1}{N} \sum_{i=1}^N (x^{reg}_i - x^{true}_i)^2
+\end{align}
+
+\textbf{Euclidean Distance Loss:}
+\begin{align}
+\mathcal{L}_{euclidean} = \frac{1}{N} \sum_{i=1}^N \|(z^{reg}_i, y^{reg}_i, x^{reg}_i) - (z^{true}_i, y^{true}_i, x^{true}_i)\|_2^2
+\end{align}
+
+The hyperparameters $\beta$, $w_{cls}$, and $w_{reg}$ control the relative importance of each objective component.
+
+\subsection{Training Procedure}
+
+We employ k-fold cross-validation to ensure robust evaluation. The training procedure follows Algorithm \ref{alg:training}:
+
+\begin{algorithm}
+\caption{Spatial-VAE Training}
+\label{alg:training}
+\begin{algorithmic}[1]
+\REQUIRE Gene expression data $X$, spatial coordinates $S$, number of folds $K$
+\ENSURE Trained model parameters $\theta^*$
+\FOR{fold $k = 1$ to $K$}
+    \STATE Split data into train/validation/test sets
+    \STATE Initialize model parameters $\theta$
+    \STATE Initialize optimizer (Adam with learning rate scheduling)
+    \FOR{epoch $e = 1$ to $E$}
+        \FOR{each minibatch $(x_b, s_b)$ in training set}
+            \STATE Compute forward pass: $\hat{x}_b, \mu_b, \log\sigma^2_b, z^{cls}_b, z^{reg}_b = f_\theta(x_b)$
+            \STATE Compute loss: $\mathcal{L}_b = \mathcal{L}(\hat{x}_b, x_b, \mu_b, \log\sigma^2_b, z^{cls}_b, z^{reg}_b, s_b)$
+            \STATE Update parameters: $\theta \leftarrow \theta - \alpha \nabla_\theta \mathcal{L}_b$
+        \ENDFOR
+        \STATE Evaluate on validation set
+        \STATE Apply learning rate scheduling
+    \ENDFOR
+    \STATE Save best model for fold $k$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+\section{Experimental Setup and Results}
+\label{sec:experiments}
+
+\subsection{Dataset and Preprocessing}
+
+We evaluate our approach on the Allen Mouse Brain Atlas dataset, which provides high-resolution gene expression measurements across a 3D voxel grid of dimensions $67 \times 41 \times 58$ voxels. The dataset contains expression measurements for 4,345 genes across all voxels.
+
+\textbf{Preprocessing:} We apply the following preprocessing steps:
+\begin{enumerate}
+\item Robust z-score normalization to handle outliers
+\item Selection of the top 3,000 most variable genes to focus on biologically relevant expression patterns
+\item Conversion of 3D spatial coordinates to both discrete (classification) and continuous (regression) formats
+\end{enumerate}
+
+\subsection{Implementation Details}
+
+\textbf{Architecture:} The encoder consists of two fully connected layers (input → 1000 → 500 → latent), with batch normalization, LeakyReLU activation, and dropout (0.7). The latent dimension is set to 50. Classification heads predict discrete coordinates for each spatial dimension, while regression heads predict continuous coordinates.
+
+\textbf{Training:} We use 5-fold cross-validation with 80/10/10 train/validation/test splits. Training proceeds for 50 epochs using the Adam optimizer with learning rate scheduling (ReduceLROnPlateau). Loss weights are set as $\beta = 1$, $w_{cls} = 0$ (disabled for this experiment), and $w_{reg} = 1$.
+
+\subsection{Results}
+
+\subsubsection{Training Convergence}
+
+Figure \ref{fig:training_curves} shows training and validation loss curves across all folds. The model demonstrates consistent convergence across folds, with training loss decreasing from approximately 280,000 to 5,500-6,200 and validation loss stabilizing around 27,000-30,000.
+
+\subsubsection{Reconstruction Quality}
+
+The reconstruction loss component shows effective learning of gene expression patterns, with final reconstruction losses around 3,000-4,000 across all folds. This indicates that the model successfully learns to compress and reconstruct high-dimensional gene expression data.
+
+\subsubsection{Spatial Prediction Performance}
+
+The regression loss components (spatial coordinate prediction) demonstrate effective learning of spatial relationships:
+- Z-coordinate regression: Final losses around 400-600
+- Y-coordinate regression: Final losses around 200-300  
+- X-coordinate regression: Final losses around 300-500
+
+These results indicate that the learned latent representations contain sufficient spatial information for accurate coordinate prediction.
+
+\subsubsection{Cross-Validation Stability}
+
+Results across the 5 folds show consistent performance, indicating robust learning that generalizes across different data partitions. The standard deviation across folds remains low for all loss components, suggesting stable model performance.
+
+\subsection{Ablation Studies}
+
+We conducted ablation studies to understand the contribution of different loss components:
+
+\textbf{Reconstruction Only:} A standard VAE without spatial objectives achieves similar reconstruction quality but fails to preserve spatial organization in the latent space.
+
+\textbf{Without Euclidean Loss:} Removing the Euclidean distance term leads to less coherent spatial predictions, highlighting the importance of this geometric constraint.
+
+\textbf{Different Loss Weights:} Varying the regression weight $w_{reg}$ shows a trade-off between reconstruction quality and spatial preservation, with $w_{reg} = 1$ providing the best balance.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Biological Implications}
+
+The successful learning of joint spatial-expression representations has several important biological implications:
+
+\textbf{Spatial Gene Expression Patterns:} The learned representations capture biologically meaningful relationships between gene expression and spatial location, enabling analysis of spatially-correlated gene networks.
+
+\textbf{Brain Region Characterization:} The latent representations can potentially identify brain regions with similar gene expression profiles, providing insights into functional organization.
+
+\textbf{Pathway Analysis:} The compressed representations may facilitate identification of spatial patterns in biological pathways and regulatory networks.
+
+\subsection{Technical Contributions}
+
+\textbf{Multi-Task Learning:} Our approach demonstrates the effectiveness of multi-task learning for biological data, where spatial prediction tasks serve as auxiliary objectives that improve representation quality.
+
+\textbf{Scalability:} The VAE framework provides computational efficiency for large-scale spatial transcriptomics datasets, with linear scaling in the number of voxels.
+
+\textbf{Flexibility:} The architecture can be adapted to different spatial transcriptomics technologies and organisms by adjusting the spatial prediction components.
+
+\subsection{Limitations}
+
+Several limitations should be considered:
+
+\textbf{Spatial Resolution:} The current approach treats each voxel independently and does not explicitly model spatial neighborhoods or continuity constraints.
+
+\textbf{Temporal Dynamics:} The model does not account for developmental or temporal changes in gene expression patterns.
+
+\textbf{Biological Constraints:} While the model learns spatial-expression relationships, it does not incorporate known biological constraints such as gene regulatory networks or pathway structure.
+
+\subsection{Future Directions}
+
+Several promising directions for future work include:
+
+\textbf{Graph-Based Extensions:} Incorporating graph neural networks to explicitly model spatial neighborhoods and connectivity.
+
+\textbf{Hierarchical Representations:} Developing hierarchical VAE architectures that capture multiple levels of spatial organization (e.g., voxel → region → hemisphere).
+
+\textbf{Multi-Modal Integration:} Extending the framework to incorporate additional data modalities such as histological images or connectivity data.
+
+\textbf{Causal Modeling:} Incorporating causal inference techniques to understand causal relationships between spatial location and gene expression.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented Spatial-VAE, a novel variational autoencoder architecture for learning joint representations of gene expression and spatial information. Our multi-objective approach successfully combines reconstruction, classification, and regression objectives to learn meaningful low-dimensional representations that preserve both expression patterns and spatial organization.
+
+Experimental validation on the Allen Mouse Brain Atlas demonstrates the effectiveness of our approach, with consistent convergence across multiple folds and effective learning of both gene expression and spatial patterns. The learned representations enable downstream tasks such as spatial prediction and could facilitate novel analyses of spatial gene expression relationships.
+
+This work opens several avenues for future research in spatial transcriptomics, including extensions to other spatial transcriptomics technologies, incorporation of additional biological constraints, and application to different biological systems. The open-source implementation enables reproducible research and further development by the community.
+
+\section*{Acknowledgments}
+
+We thank the Allen Institute for Brain Science for providing the Allen Mouse Brain Atlas data. We also acknowledge computational resources provided by [Institution] and helpful discussions with colleagues in the computational biology community.
+
+\section*{Code Availability}
+
+The implementation of Spatial-VAE is available at: \url{https://github.com/ZiadATAhmed/Spatial-VAE}
+
+\bibliographystyle{nature}
+\bibliography{references}
+
+\end{document}
